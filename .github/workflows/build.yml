@@ -1,48 +1,34 @@
-name: Build J.FTP
-
+name: Build
 on:
   push:
-    paths:
-      - '*.zip'
-      - '.github/workflows/build.yml'
+    branches: ['**']
+    paths: ['*.zip']
   workflow_dispatch:
-
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Распаковать zip с исходниками
         run: |
           ZIP=$(ls *.zip 2>/dev/null | head -n1)
           if [ -z "$ZIP" ]; then echo "В репозитории нет zip-архива"; exit 1; fi
-          echo "Архив: $ZIP"
           mkdir src && unzip -q "$ZIP" -d src
           SETTINGS=$(find src -name 'settings.gradle*' -not -path '*__MACOSX*' | head -n1)
           if [ -z "$SETTINGS" ]; then echo "В архиве нет settings.gradle"; exit 1; fi
           echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
-
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: android-actions/setup-android@v3
-
+        with: {distribution: temurin, java-version: 17}
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.7
-
+        with: {gradle-version: 8.7}
       - name: Сборка APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: gradle assembleDebug
-
-      - name: Переименовать APK
-        run: cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" J.FTP.apk
-
-      - uses: actions/upload-artifact@v4
+        run: gradle :app:assembleRelease --no-daemon
+      - run: cp "$PROJECT_DIR/app/build/outputs/apk/release/app-release.apk" J.FTP.apk
+      - uses: softprops/action-gh-release@v2
         with:
-          name: J.FTP
-          path: 
-          J.FTP.apk
+          tag_name: v${{ github.run_number }}
+          name: J.FTP 1.${{ github.run_number }}
+          files: J.FTP.apk
